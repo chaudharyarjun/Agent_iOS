@@ -18,8 +18,7 @@ struct AgentView: View {
             .background(Color(hex: "020406").ignoresSafeArea())
             .navigationTitle("Agent Terminal")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(Color(hex: "07090d"), for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
+            .navBarBackground(Color(hex: "07090d"))
         }
     }
 }
@@ -95,7 +94,7 @@ struct AgentTerminal: View {
 
     var body: some View {
         ScrollViewReader { proxy in
-            ScrollView {
+            ScrollView(.vertical, showsIndicators: false) {
                 LazyVStack(alignment: .leading, spacing: 2) {
                     terminalContent
                 }
@@ -103,7 +102,13 @@ struct AgentTerminal: View {
             }
             .background(Color(hex: "020406"))
             .onChange(of: state.logs.count) { _ in
-                scrollToBottom(proxy: proxy)
+                withAnimation {
+                    if state.isRunning {
+                        proxy.scrollTo("cursor")
+                    } else {
+                        proxy.scrollTo(state.logs.last?.id)
+                    }
+                }
             }
         }
     }
@@ -121,16 +126,6 @@ struct AgentTerminal: View {
                     .font(.system(size: 13, design: .monospaced))
                     .foregroundColor(.accent)
                     .id("cursor")
-            }
-        }
-    }
-
-    private func scrollToBottom(proxy: ScrollViewProxy) {
-        withAnimation {
-            if state.isRunning {
-                proxy.scrollTo("cursor")
-            } else {
-                proxy.scrollTo(state.logs.last?.id)
             }
         }
     }
@@ -163,37 +158,10 @@ struct AgentToolbar: View {
             toolbarStatus
             Spacer()
             if !state.isRunning && !state.logs.isEmpty {
-                clearButton
+                AppButton(title: "Clear", style: .dim, isSmall: true) {
+                    state.logs = []
+                }
             }
-            actionButton
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(Color.bg2)
-    }
-
-    @ViewBuilder
-    private var toolbarStatus: some View {
-        if state.isRunning {
-            StatusPill(
-                text: "\(state.currentPhase) · \(state.toolCallCount) calls",
-                animate: true
-            )
-        } else if !state.logs.isEmpty {
-            Text("Done · \(state.toolCallCount) calls · \(state.findings.count) findings")
-                .font(.system(size: 10, design: .monospaced))
-                .foregroundColor(.textMuted)
-        }
-    }
-
-    private var clearButton: some View {
-        AppButton(title: "Clear", style: .dim, isSmall: true) {
-            state.logs = []
-        }
-    }
-
-    private var actionButton: some View {
-        Group {
             if state.isRunning {
                 AppButton(title: "Abort", icon: "⊘", style: .red, isSmall: true) {
                     engine.abort()
@@ -210,6 +178,20 @@ struct AgentToolbar: View {
                 }
             }
         }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(Color.bg2)
+    }
+
+    @ViewBuilder
+    private var toolbarStatus: some View {
+        if state.isRunning {
+            StatusPill(text: "\(state.currentPhase) · \(state.toolCallCount) calls", animate: true)
+        } else if !state.logs.isEmpty {
+            Text("Done · \(state.toolCallCount) calls · \(state.findings.count) findings")
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundColor(.textMuted)
+        }
     }
 }
 
@@ -219,8 +201,15 @@ struct LogLineView: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
-            timestampView
-            logTextView
+            Text(log.timestamp, style: .time)
+                .font(.system(size: 9, design: .monospaced))
+                .foregroundColor(Color(hex: "1e2a38"))
+                .frame(width: 60, alignment: .leading)
+            Text(log.text)
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundColor(log.type.color.opacity(log.type == .toolResult ? 0.5 : 1))
+                .lineLimit(nil)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.leading, log.type.isIndented ? 12 : 0)
         .overlay(alignment: .leading) {
@@ -230,20 +219,5 @@ struct LogLineView: View {
                     .frame(width: 2)
             }
         }
-    }
-
-    private var timestampView: some View {
-        Text(log.timestamp, style: .time)
-            .font(.system(size: 9, design: .monospaced))
-            .foregroundColor(Color(hex: "1e2a38"))
-            .frame(width: 60, alignment: .leading)
-    }
-
-    private var logTextView: some View {
-        Text(log.text)
-            .font(.system(size: 11, design: .monospaced))
-            .foregroundColor(log.type.color.opacity(log.type == .toolResult ? 0.5 : 1))
-            .lineLimit(nil)
-            .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
