@@ -18,11 +18,22 @@ jobs:
     - name: Install XcodeGen
       run: brew install xcodegen
 
+    - name: Find project.yml and set working directory
+      run: |
+        SPEC=$(find . -name "project.yml" | head -1)
+        echo "Found project.yml at: $SPEC"
+        PROJDIR=$(dirname "$SPEC")
+        echo "Project directory: $PROJDIR"
+        echo "PROJECT_DIR=$PROJDIR" >> $GITHUB_ENV
+
     - name: Generate Xcode project
-      run: xcodegen generate
+      run: |
+        cd "$PROJECT_DIR"
+        xcodegen generate
 
     - name: Build unsigned app
       run: |
+        cd "$PROJECT_DIR"
         xcodebuild \
           -project DroidAgentPro.xcodeproj \
           -scheme DroidAgentPro \
@@ -38,15 +49,15 @@ jobs:
 
     - name: Package into IPA
       run: |
-        cd DroidAgentPro
+        cd "$PROJECT_DIR"
         mkdir -p Payload
         cp -r ./build/Release-iphoneos/DroidAgentPro.app Payload/
         zip -r DroidAgentPro.ipa Payload/
-        echo "Built: $(du -sh DroidAgentPro.ipa | cut -f1)"
+        echo "IPA size: $(du -sh DroidAgentPro.ipa | cut -f1)"
 
     - name: Upload IPA
       uses: actions/upload-artifact@v4
       with:
         name: DroidAgentPro-unsigned
-        path: DroidAgentPro.ipa
+        path: "**/DroidAgentPro.ipa"
         retention-days: 30
