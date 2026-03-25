@@ -1,0 +1,51 @@
+name: Build DroidAgent IPA
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Install XcodeGen
+      run: brew install xcodegen
+
+    - name: Generate Xcode project
+      run: xcodegen generate
+
+    - name: Build unsigned app
+      run: |
+        xcodebuild \
+          -project DroidAgentPro.xcodeproj \
+          -scheme DroidAgentPro \
+          -configuration Release \
+          -sdk iphoneos \
+          -destination "generic/platform=iOS" \
+          CODE_SIGN_IDENTITY="" \
+          CODE_SIGNING_REQUIRED=NO \
+          CODE_SIGNING_ALLOWED=NO \
+          ONLY_ACTIVE_ARCH=NO \
+          clean build \
+          CONFIGURATION_BUILD_DIR=./build/Release-iphoneos
+
+    - name: Package into IPA
+      run: |
+        mkdir -p Payload
+        cp -r ./build/Release-iphoneos/DroidAgentPro.app Payload/
+        zip -r DroidAgentPro.ipa Payload/
+        echo "Built: $(du -sh DroidAgentPro.ipa | cut -f1)"
+
+    - name: Upload IPA
+      uses: actions/upload-artifact@v4
+      with:
+        name: DroidAgentPro-unsigned
+        path: DroidAgentPro.ipa
+        retention-days: 30
