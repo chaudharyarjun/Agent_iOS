@@ -4,8 +4,6 @@ struct SurfaceView: View {
     @ObservedObject var state: AppState
     @ObservedObject var engine: AgentEngine
     @State private var filter: SurfaceFilter = .all
-    @State private var selectedEndpoint: Endpoint? = nil
-    @State private var selectedComponent: AndroidComponent? = nil
 
     enum SurfaceFilter: String, CaseIterable {
         case all, http, activity, service, receiver, provider, deeplink
@@ -15,6 +13,7 @@ struct SurfaceView: View {
     var filteredEndpoints: [Endpoint] {
         filter == .all || filter == .http ? state.endpoints : []
     }
+
     var filteredComponents: [AndroidComponent] {
         guard filter != .http else { return [] }
         return state.components.filter { filter == .all || $0.type == filter.rawValue }
@@ -23,103 +22,102 @@ struct SurfaceView: View {
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
-                // Filter strip
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
-                        ForEach(SurfaceFilter.allCases, id: \.self) { f in
-                            Button {
-                                withAnimation(.easeInOut(duration: 0.15)) { filter = f }
-                            } label: {
-                                Text(f.label)
-                                    .font(.system(size: 10, weight: .bold, design: .monospaced))
-                                    .foregroundColor(filter == f ? .accent : .textMuted)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 7)
-                                    .background(filter == f ? Color.accent.opacity(0.1) : Color.clear)
-                                    .overlay(Capsule().stroke(filter == f ? Color.accent.opacity(0.4) : Color.border2, lineWidth: 1))
-                                    .clipShape(Capsule())
-                            }
-                        }
-                        Spacer()
-                        AppButton(title: "Attack All", icon: "▶", style: .green, isSmall: true) {
-                            Task { await engine.run(context: "all discovered endpoints and components") }
-                        }
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                }
-                .background(Color.bg2)
+                filterStrip
                 Divider().background(Color.border)
-
                 if state.endpoints.isEmpty && state.components.isEmpty {
                     emptyState
                 } else {
-                    List {
-                        if !filteredEndpoints.isEmpty {
-                            Section {
-                                ForEach(filteredEndpoints) { ep in
-                                    EndpointRow(ep: ep, engine: engine)
-                                        .listRowBackground(Color.bg2)
-                                        .listRowSeparatorTint(Color.border)
-                                }
-                            } header: {
-                                Text("HTTP ENDPOINTS (\(filteredEndpoints.count))")
-                                    .font(.system(size: 9, weight: .bold, design: .monospaced))
-                                    .foregroundColor(.textMuted)
-                                    .kerning(2)
-                            }
-                        }
-                        if !filteredComponents.isEmpty {
-                            Section {
-                                ForEach(filteredComponents) { comp in
-                                    ComponentRow(comp: comp, engine: engine)
-                                        .listRowBackground(Color.bg2)
-                                        .listRowSeparatorTint(Color.border)
-                                }
-                            } header: {
-                                Text("COMPONENTS (\(filteredComponents.count))")
-                                    .font(.system(size: 9, weight: .bold, design: .monospaced))
-                                    .foregroundColor(.textMuted)
-                                    .kerning(2)
-                            }
-                        }
-                    }
-                    .listStyle(.insetGrouped)
-                    .scrollContentBackground(.hidden)
-                    .background(Color.bg)
+                    surfaceList
                 }
             }
             .background(Color.bg.ignoresSafeArea())
             .navigationTitle("Attack Surface")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(Color(hex: "07090d"), for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
+            .navBarBackground(Color(hex: "07090d"))
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    HStack(spacing: 4) {
-                        Text("\(state.endpoints.count + state.components.count)")
-                            .font(.system(size: 10, weight: .bold, design: .monospaced))
-                            .foregroundColor(.accent)
-                        Text("items")
-                            .font(.system(size: 10, design: .monospaced))
-                            .foregroundColor(.textMuted)
-                    }
+                    Text("\(state.endpoints.count + state.components.count) items")
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundColor(.textMuted)
                 }
             }
         }
     }
 
-    var emptyState: some View {
+    private var filterStrip: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                ForEach(SurfaceFilter.allCases, id: \.self) { f in
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.15)) { filter = f }
+                    } label: {
+                        Text(f.label)
+                            .font(.system(size: 10, weight: .bold, design: .monospaced))
+                            .foregroundColor(filter == f ? .accent : .textMuted)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 7)
+                            .background(filter == f ? Color.accent.opacity(0.1) : Color.clear)
+                            .overlay(Capsule().stroke(filter == f ? Color.accent.opacity(0.4) : Color.border2, lineWidth: 1))
+                            .clipShape(Capsule())
+                    }
+                }
+                Spacer()
+                AppButton(title: "Attack All", icon: "▶", style: .green, isSmall: true) {
+                    Task { await engine.run(context: "all discovered endpoints and components") }
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+        }
+        .background(Color.bg2)
+    }
+
+    private var surfaceList: some View {
+        List {
+            if !filteredEndpoints.isEmpty {
+                Section {
+                    ForEach(filteredEndpoints) { ep in
+                        EndpointRow(ep: ep, engine: engine)
+                            .listRowBackground(Color.bg2)
+                            .listRowSeparatorTint(Color.border)
+                    }
+                } header: {
+                    Text("HTTP ENDPOINTS (\(filteredEndpoints.count))")
+                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                        .foregroundColor(.textMuted)
+                        .kerning(2)
+                }
+            }
+            if !filteredComponents.isEmpty {
+                Section {
+                    ForEach(filteredComponents) { comp in
+                        ComponentRow(comp: comp, engine: engine)
+                            .listRowBackground(Color.bg2)
+                            .listRowSeparatorTint(Color.border)
+                    }
+                } header: {
+                    Text("COMPONENTS (\(filteredComponents.count))")
+                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                        .foregroundColor(.textMuted)
+                        .kerning(2)
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+        .listBackground(Color.bg)
+        .background(Color.bg)
+    }
+
+    private var emptyState: some View {
         VStack(spacing: 14) {
             Text("🗺").font(.system(size: 48))
             Text("Attack Surface Empty")
                 .font(.system(size: 14, weight: .bold, design: .monospaced))
                 .foregroundColor(.textMuted)
-            Text("Record a session or run the agent to populate the attack surface map.")
+            Text("Record a session or run the agent\nto populate the attack surface map.")
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundColor(.textDim)
                 .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
             HStack(spacing: 10) {
                 AppButton(title: "Run Recon", icon: "▶", style: .green) {
                     Task { await engine.run(context: "recon only, enumerate all components") }
@@ -162,7 +160,7 @@ struct EndpointRow: View {
                     Divider().background(Color.border)
                     HStack(spacing: 6) {
                         AppButton(title: "Fuzz", style: .dim, isSmall: true) {
-                            Task { await engine.run(context: "fuzz endpoint \(ep.url) with sqli xss traversal") }
+                            Task { await engine.run(context: "fuzz endpoint \(ep.url)") }
                         }
                         AppButton(title: "IDOR", style: .red, isSmall: true) {
                             Task { await engine.run(context: "test IDOR on endpoint \(ep.url)") }
@@ -170,12 +168,6 @@ struct EndpointRow: View {
                         AppButton(title: "Strip Auth", style: .blue, isSmall: true) {
                             Task { await engine.run(context: "strip auth and replay \(ep.url)") }
                         }
-                    }
-                    if !ep.params.isEmpty {
-                        Text("Params: \(ep.params.keys.joined(separator: ", "))")
-                            .font(.system(size: 9, design: .monospaced))
-                            .foregroundColor(.textMuted)
-                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
                 .padding(.bottom, 6)
