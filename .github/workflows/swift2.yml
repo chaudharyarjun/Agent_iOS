@@ -38,6 +38,7 @@ jobs:
 
     - name: Package into IPA
       run: |
+        cd DroidAgentPro
         mkdir -p Payload
         cp -r ./build/Release-iphoneos/DroidAgentPro.app Payload/
         zip -r DroidAgentPro.ipa Payload/
